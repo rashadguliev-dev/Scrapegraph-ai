@@ -119,49 +119,38 @@ function renderResults(results) {
     // Merge all and sort
     const allSorted = [...results].sort((a, b) => a.financials.total_usd - b.financials.total_usd);
 
-    allSorted.forEach(car => {
+    allSorted.forEach((car, index) => {
         const tr = document.createElement('tr');
 
         const isUAE = car.source_country === 'UAE';
         const savings = uaeAvg > 0 ? (uaeAvg - car.financials.total_usd) : 0;
         const savingsPct = uaeAvg > 0 ? (savings / uaeAvg * 100) : 0;
 
-        let savingsHtml = '-';
+        // Profit calculation
+        // Profit = UAE Avg - Landed - 1000
+        const profit = uaeAvg > 0 ? (uaeAvg - car.financials.total_usd - 1000) : 0;
+        const profitClass = profit > 0 ? 'text-green-600' : 'text-red-600';
+
+        let savingsHtml = 'Базовая';
         if (!isUAE && uaeAvg > 0) {
             const color = savings > 0 ? 'text-green-600' : 'text-red-600';
             const sign = savings > 0 ? '-' : '+';
-            savingsHtml = `<span class="${color} font-bold">${sign}${Math.abs(savingsPct).toFixed(1)}%</span>`;
+            // Example: -25.7% 🔥
+            const fire = savingsPct > 20 ? '🔥' : (savingsPct > 10 ? '✅' : '');
+            savingsHtml = `<span class="${color} font-bold">${sign}${Math.abs(savingsPct).toFixed(1)}% ${fire}</span>`;
         }
 
+        // Columns: No, Flag, Year, Site, Price, Landed, vs UAE, Profit
         tr.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center">
-                    <div class="ml-0">
-                        <div class="text-sm font-medium text-gray-900">${getFlag(car.source_country)} ${car.source_country}</div>
-                        <div class="text-xs text-gray-500">${new URL(car.site).hostname}</div>
-                    </div>
-                </div>
-            </td>
-            <td class="px-6 py-4">
-                <div class="text-sm text-gray-900">${car.year} ${car.model}</div>
-                <div class="text-xs text-gray-500">${car.mileage || '?'}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                ${formatCurrency(car.price, car.currency)}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                 <div class="text-xs">
-                    Shipping: ${formatCurrency(car.financials.shipping_usd)}<br>
-                    VAT: ${formatCurrency(car.financials.vat_usd)}
-                 </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                ${formatCurrency(car.financials.total_usd)}
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                ${savingsHtml}
-            </td>
-             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${index + 1}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-2xl">${getFlag(car.source_country)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${car.year}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${new URL(car.site).hostname}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatCurrency(car.price, car.currency)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${formatCurrency(car.financials.total_usd)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm">${savingsHtml}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm font-bold ${profitClass}">${!isUAE ? formatCurrency(profit) : '0'}</td>
+             <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                 <a href="${car.link}" target="_blank" class="text-blue-600 hover:text-blue-900">Link</a>
             </td>
         `;

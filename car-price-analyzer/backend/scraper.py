@@ -31,12 +31,16 @@ graph_config = {
         "model": "gemini-1.5-flash",
         "api_key": api_key,
     },
+    "embeddings": {
+        "model": "gemini-embedding-001",
+        "api_key": api_key,
+    },
     "verbose": True,
     "headless": True,
 }
 
 async def scrape_with_crawl4ai(url: str) -> str:
-    """Fast crawling with Crawl4AI"""
+    """Быстрый краулинг с Crawl4AI"""
     try:
         async with AsyncWebCrawler() as crawler:
             result = await crawler.arun(url=url)
@@ -46,51 +50,18 @@ async def scrape_with_crawl4ai(url: str) -> str:
         raise e
 
 async def scrape_with_scrapegraph(url: str, prompt: str) -> Dict:
-    """AI scraping with ScrapeGraphAI"""
+    """AI-парсинг с ScrapeGraphAI + Gemini"""
     try:
-        # SmartScraperGraph is synchronous in run(), need to wrap it?
-        # Actually it might make http calls.
-        # But for now let's run it directly.
-        smart_scraper = SmartScraperGraph(
-            prompt=prompt,
-            source=url,
-            config=graph_config
-        )
-        result = smart_scraper.run()
+        # SmartScraperGraph run() is synchronous/blocking.
+        # We run it in an executor to avoid blocking the asyncio loop.
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: _run_smart_scraper(url, prompt))
         return result
     except Exception as e:
         logger.error(f"ScrapeGraphAI error on {url}: {e}")
         return {"error": str(e)}
 
-async def get_car_prices(url: str, make: str, model: str, year_min: int, year_max: int) -> Optional[Dict]:
-    prompt = f"""
-    Extract information about used cars matching: {make} {model} between years {year_min} and {year_max}.
-    For each car found, extract:
-    - Year
-    - Model
-    - Price (numeric value)
-    - Currency (ISO 4217 code only: AED, USD, JPY, EUR, KRW, CNY)
-    - Mileage (with unit)
-    - Link to ad
-
-    Return a list of objects under key 'cars'.
-    Ignore damaged cars or cars without price.
-    """
-
-    try:
-        # Strategy: Try ScrapeGraphAI directly as it handles extraction best.
-        # If it fails, could fall back to Crawl4AI + LLM parsing manually,
-        # but ScrapeGraphAI does that internally.
-
-        # Note: ScrapeGraphAI run() is blocking. In async app, better run in executor.
-        loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: smart_scraper_run(url, prompt))
-        return data
-    except Exception as e:
-        logger.error(f"Error scraping {url}: {e}")
-        return None
-
-def smart_scraper_run(url, prompt):
+def _run_smart_scraper(url, prompt):
     smart_scraper = SmartScraperGraph(
         prompt=prompt,
         source=url,
@@ -98,22 +69,72 @@ def smart_scraper_run(url, prompt):
     )
     return smart_scraper.run()
 
-async def scrape_with_retry(url: str, make: str, model: str, year_min: int, year_max: int, max_retries: int = 3) -> Dict:
+async def get_car_prices(url: str) -> Optional[Dict]:
+    # Exact prompt from TOR
+    prompt = """
+    Извлеки информацию о автомобилях:
+    - Год выпуска
+    - Модель
+    - Цена (с валютой)
+    - Ссылка на объявление
+    Игнорируй битые авто и авто без цены.
+
+    Return a list of objects under key 'cars'.
+    Example format:
+    {
+      "cars": [
+        {"year": 2022, "model": "Camry", "price": 20000, "currency": "USD", "link": "..."},
+        ...
+      ]
+    }
+    """
+
+    try:
+        # Вариант 1: Быстрый краулинг (optional usage per logic)
+        # content = await scrape_with_crawl4ai(url)
+
+        # Вариант 2: AI-извлечение данных direct from URL via ScrapeGraph
+        data = await scrape_with_scrapegraph(url, prompt)
+
+        return data
+    except Exception as e:
+        logger.error(f"❌ Ошибка на {url}: {e}")
+        return None
+
+async def scrape_with_retry(url: str, max_retries: int = 3) -> Dict:
+    """
+    Парсинг с повторными попытками
+    """
     for attempt in range(max_retries):
         try:
-            async with asyncio.timeout(60): # Increased timeout
-                result = await get_car_prices(url, make, model, year_min, year_max)
-                if result and 'cars' in result and result['cars']:
-                    # Post-process to ensure source url is included if needed
-                    for car in result['cars']:
-                        car['source_site'] = url
+            # Таймаут 30 секунд
+            async with asyncio.timeout(30):
+                result = await get_car_prices(url)
+                # Validation: check if result has cars
+                if result and 'cars' in result:
+                    # Enrich with source site for later processing
+                    result['source_url'] = url
                     return result
-                # If result is empty or error, retry?
+
+                # If valid JSON but no cars or error key
                 if result and 'error' in result:
-                    raise Exception(result['error'])
+                     raise Exception(result['error'])
+
+                # If result is None or empty
+                if not result:
+                    raise Exception("Empty result")
+
+                return result
+
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout на {url}, попытка {attempt + 1}/{max_retries}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(5)  # Пауза перед повтором
+
         except Exception as e:
-            logger.error(f"Retry {attempt + 1}/{max_retries} failed for {url}: {e}")
+            logger.error(f"Ошибка на {url}: {str(e)}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(5)
 
-    return {"error": f"Failed to scrape {url} after {max_retries} attempts"}
+    # Если все попытки провалились
+    return {"error": f"Не удалось получить данные с {url}"}

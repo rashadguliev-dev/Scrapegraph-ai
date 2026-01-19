@@ -1,5 +1,7 @@
-# Search URL Templates for targeted scraping
 
+# 📊 ПОЛНЫЙ СПИСОК САЙТОВ С ССЫЛКАМИ И ШАБЛОНАМИ ПОИСКА
+
+# 🇦🇪 UAE (Местный рынок)
 UAE_SITES = [
     {
         "name": "Dubizzle",
@@ -21,13 +23,14 @@ UAE_SITES = [
         "url_template": "https://www.cars24.com/ae/buy-used-cars-uae/?mn={make}&mo={model}&yr={year_min}-{year_max}",
         "region": "UAE"
     },
-     {
+    {
         "name": "AutoTrader UAE",
         "url_template": "https://www.autotraderuae.com/used-cars/{make}/{model}/year-{year_min}/{year_max}/",
         "region": "UAE"
     }
 ]
 
+# 🇺🇸 USA
 USA_SITES = [
     {
         "name": "Cars.com",
@@ -43,9 +46,15 @@ USA_SITES = [
         "name": "Copart",
         "url_template": "https://www.copart.com/lotSearchResults?free=true&query={make}%20{model}%20{year_min}-{year_max}",
         "region": "USA"
+    },
+    {
+        "name": "IAAI",
+        "url_template": "https://www.iaai.com/Search?Keyword={make}+{model}+{year_min}",
+        "region": "USA"
     }
 ]
 
+# 🇯🇵 Japan
 JAPAN_SITES = [
     {
         "name": "SBT Japan",
@@ -61,9 +70,15 @@ JAPAN_SITES = [
         "name": "TC-V",
         "url_template": "https://www.tc-v.com/used_car/{make}/{model}/?year_from={year_min}&year_to={year_max}",
         "region": "Japan"
+    },
+    {
+        "name": "AA Japan Cars",
+        "url_template": "https://www.aajapancars.com/stock?make={make}&model={model}&year_from={year_min}&year_to={year_max}",
+        "region": "Japan"
     }
 ]
 
+# 🇰🇷 Korea
 KOREA_SITES = [
     {
         "name": "Autowini",
@@ -77,6 +92,7 @@ KOREA_SITES = [
     }
 ]
 
+# 🇨🇳 China
 CHINA_SITES = [
     {
         "name": "Alibaba",
@@ -90,6 +106,7 @@ CHINA_SITES = [
     }
 ]
 
+# 🇪🇺 Europe
 EUROPE_SITES = [
     {
         "name": "Mobile.de",

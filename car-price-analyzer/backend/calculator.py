@@ -1,4 +1,6 @@
 
+# 💰 ФИНАНСОВАЯ ФОРМУЛА С УЧЕТОМ ВАЛЮТ
+
 EXCHANGE_RATES = {
     "AED": 0.272,
     "EUR": 1.09,
@@ -8,77 +10,64 @@ EXCHANGE_RATES = {
     "USD": 1.0,
 }
 
-# Shipping costs in LOCAL currency (based on prompt)
+# Стоимость доставки из разных регионов в ОАЭ
+# Значения могут быть в разных валютах, поэтому нормализуем при расчете
+# Но согласно ТЗ "SHIPPING_COSTS" дан как словарь.
+# В ТЗ:
+# "AED": 9000,   # ~$2500
+# "USD": 2500,
+# "JPY": 350000, # ~$2500
+# "EUR": 2300,
+# "KRW": 3000000, # ~$2500
+# "CNY": 18000,  # ~$2500
+
 SHIPPING_COSTS = {
-    "AED": 9000,     # ~$2500
+    "AED": 9000,
     "USD": 2500,
-    "JPY": 350000,   # ~$2500
+    "JPY": 350000,
     "EUR": 2300,
-    "KRW": 3000000,  # ~$2500
-    "CNY": 18000,    # ~$2500
+    "KRW": 3000000,
+    "CNY": 18000,
 }
 
 def convert_to_usd(price, currency):
-    """Converts price to USD using fixed rates."""
+    """Converts price to USD using fixed rates from TOR."""
     rate = EXCHANGE_RATES.get(currency, 1.0)
     return price * rate
 
 def calculate_landed_cost(base_price, currency):
     """
-    Calculates "landed cost" and returns breakdown in USD.
-    Formula from TOR:
-    vat = base_price * 0.10
-    total_local = (base_price + vat) + shipping_local
-    Then convert to USD for comparison.
-    Also adds Customs/Duty and Port Delivery for the "Key USD" breakdown.
+    Расчет стоимости "под ключ" согласно ТЗ.
+    Returns dictionary with details in USD.
     """
-    VAT_RATE = 0.10  # 10% VAT
+    VAT_RATE = 0.10  # 10% НДС
 
-    # 1. Get Shipping Cost in Local Currency
-    shipping_local = SHIPPING_COSTS.get(currency, 2500) # Default to 2500 if unknown (assuming USD) if currency not found?
-    # Actually if currency is not in map, we might have an issue.
-    # Let's assume if not found, it's 0 or we treat it as USD 2500 converted?
-    # For safety, if currency not in list, assume USD 2500 equivalent.
-    if currency not in SHIPPING_COSTS and currency != "USD":
-        # Fallback
-        shipping_local = 0
+    # 1. Определяем стоимость доставки в валюте региона
+    # Если валюты нет в списке, используем дефолт $2500 (как USD)
+    shipping_local = SHIPPING_COSTS.get(currency, 2500)
 
-    # 2. Calculate components in Local Currency
-    vat_local = base_price * VAT_RATE
+    # 2. Основная формула из ТЗ: total = (base_price + vat) + shipping
+    # Но для корректного сложения всё должно быть в одной валюте или конвертироваться.
+    # ТЗ не уточняет валюту shipping_local в формуле, но логично, что SHIPPING_COSTS
+    # заданы в валюте региона (JPY 350000 ~ $2500).
 
-    # The prompt formula for "Total" seems to be Landed Cost in UAE?
-    # "Total = (Base + VAT) + Shipping"
-    # But wait, VAT is usually paid in UAE upon import? Or in source country?
-    # "VAT (10%)" usually refers to UAE VAT on arrival + Customs.
-    # However, the prompt says "VAT (10%): $1,904" for a Japanese car priced $19,040.
-    # So it's 10% of the car price.
-
-    # Let's follow the prompt's visual breakdown logic for the final USD numbers:
-    # Price: $19,040
-    # + VAT (10%): $1,904
-    # + Logistics JP->UAE: $2,450
-    # + Customs/Duty: $953  (This looks like ~5% of Price)
-    # + Port Delivery: $350
-    # = TOTAL: $24,697
-
-    # So:
-    # 1. Convert Base Price to USD.
+    # Конвертируем все компоненты в USD для унификации
     base_price_usd = convert_to_usd(base_price, currency)
-
-    # 2. Calculate components in USD based on the Base Price USD
-    vat_usd = base_price_usd * 0.10
-
-    # Shipping is fixed per region. We can take the shipping_local and convert it to USD,
-    # OR just use the ~2500 USD approximation for simplicity if the rates fluctuate,
-    # BUT the prompt gave specific local numbers. Let's convert the local shipping to USD.
     shipping_usd = convert_to_usd(shipping_local, currency)
 
-    # Customs: 5% of Base Price (Standard UAE)
+    # НДС считается от цены авто (по ТЗ пример: $19040 -> $1904)
+    vat_usd = base_price_usd * VAT_RATE
+
+    # Таможня/Пошлина (Customs/Duty)
+    # В примере ТЗ: Price $19,040 -> Customs $953. Это ровно 5% (стандарт ОАЭ).
     customs_usd = base_price_usd * 0.05
 
-    # Port Delivery: Fixed ~$350-$450. Prompt says $350 in one, $450 in another. Let's avg or use $400.
-    port_delivery_usd = 400.0
+    # Доставка в порт (Port Delivery)
+    # В примере ТЗ: $350. Зафиксируем среднее.
+    port_delivery_usd = 350.0
 
+    # ИТОГО ПОД КЛЮЧ
+    # Пример ТЗ: Base + VAT + Logistics + Customs + Port Delivery
     total_usd = base_price_usd + vat_usd + shipping_usd + customs_usd + port_delivery_usd
 
     return {
@@ -91,3 +80,16 @@ def calculate_landed_cost(base_price, currency):
         "port_delivery_usd": port_delivery_usd,
         "total_usd": round(total_usd, 2)
     }
+
+def calculate_profit(uae_avg_price_usd, landed_cost_usd):
+    """
+    Прибыль = Средняя цена UAE ($33,250) - Цена под ключ - Расходы на продажу ($1,000)
+    """
+    SELLING_COSTS = 1000.0
+    if uae_avg_price_usd <= 0:
+        return 0, 0
+
+    profit = uae_avg_price_usd - landed_cost_usd - SELLING_COSTS
+    roi = (profit / landed_cost_usd) * 100 if landed_cost_usd > 0 else 0
+
+    return round(profit, 2), round(roi, 1)
