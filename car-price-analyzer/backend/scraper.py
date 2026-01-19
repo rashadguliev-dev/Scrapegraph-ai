@@ -69,7 +69,7 @@ async def get_car_prices(url: str, make: str, model: str, year_min: int, year_ma
     - Year
     - Model
     - Price (numeric value)
-    - Currency (AED, USD, JPY, EUR, KRW, CNY)
+    - Currency (ISO 4217 code only: AED, USD, JPY, EUR, KRW, CNY)
     - Mileage (with unit)
     - Link to ad
 
