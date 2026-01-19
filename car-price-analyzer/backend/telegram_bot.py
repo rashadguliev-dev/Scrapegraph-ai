@@ -68,12 +68,9 @@ async def send_telegram_report(results, make, model):
         car = imports[i]
         fin = car['financials']
 
-        # Savings calculation
-        savings_usd = 0
-        savings_pct = 0
-        if uae_avg_usd > 0:
-            savings_usd = uae_avg_usd - fin['total_usd']
-            savings_pct = (savings_usd / uae_avg_usd) * 100
+        # Savings (pre-calculated)
+        savings_usd = car.get('savings_usd', 0)
+        savings_pct = car.get('savings_pct', 0)
 
         flag = get_flag(car['source_country'])
         site_name = car.get('site_name', 'Site')
@@ -127,7 +124,7 @@ async def send_telegram_report(results, make, model):
     # --- BUSINESS ANALYTICS ---
     # Based on the #1 Best Deal
     best_deal = imports[0]
-    best_savings = uae_avg_usd - best_deal['financials']['total_usd'] if uae_avg_usd > 0 else 0
+    best_savings = best_deal.get('savings_usd', 0)
 
     msg.append("💡 *БИЗНЕС-АНАЛИТИКА*")
     msg.append("┌────────────────────────────────────────────────────────┐")

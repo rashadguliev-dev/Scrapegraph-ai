@@ -39,13 +39,11 @@ graph_config = {
     "headless": True,
 }
 
-# Note: crawl4ai is available for custom fetching strategies if needed.
-# Currently using ScrapeGraphAI's built-in fetching.
-# async def scrape_with_crawl4ai(url: str) -> str:
-#     """Reference: Fast crawling with Crawl4AI if needed in future."""
-#     async with AsyncWebCrawler() as crawler:
-#         result = await crawler.arun(url=url)
-#         return result.markdown
+async def scrape_with_crawl4ai(url: str) -> str:
+    """Быстрый краулинг с Crawl4AI (из ТЗ)"""
+    async with AsyncWebCrawler() as crawler:
+        result = await crawler.arun(url=url)
+        return result.markdown
 
 async def scrape_with_scrapegraph(url: str, prompt: str) -> Dict:
     """AI-парсинг с ScrapeGraphAI + Gemini"""

@@ -127,33 +127,65 @@ function renderResults(results) {
         const savingsPct = uaeAvg > 0 ? (savings / uaeAvg * 100) : 0;
 
         // Profit calculation
-        // Profit = UAE Avg - Landed - 1000
         const profit = uaeAvg > 0 ? (uaeAvg - car.financials.total_usd - 1000) : 0;
         const profitClass = profit > 0 ? 'text-green-600' : 'text-red-600';
 
-        let savingsHtml = 'Базовая';
+        // Helper to create Text Cells (Safe from XSS)
+        const createTd = (text, className) => {
+            const td = document.createElement('td');
+            td.className = className;
+            td.textContent = text;
+            return td;
+        };
+
+        tr.appendChild(createTd(index + 1, "px-4 py-4 whitespace-nowrap text-sm text-gray-500"));
+        tr.appendChild(createTd(getFlag(car.source_country), "px-4 py-4 whitespace-nowrap text-2xl"));
+        tr.appendChild(createTd(car.year, "px-4 py-4 whitespace-nowrap text-sm text-gray-900"));
+
+        let hostname = car.site;
+        try { hostname = new URL(car.site).hostname; } catch(e){}
+        tr.appendChild(createTd(hostname, "px-4 py-4 whitespace-nowrap text-sm text-gray-500"));
+
+        tr.appendChild(createTd(formatCurrency(car.price, car.currency), "px-4 py-4 whitespace-nowrap text-sm text-gray-500"));
+        tr.appendChild(createTd(formatCurrency(car.financials.total_usd), "px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900"));
+
+        // Savings Column (Contains HTML for styling)
+        const tdSavings = document.createElement('td');
+        tdSavings.className = "px-4 py-4 whitespace-nowrap text-sm";
         if (!isUAE && uaeAvg > 0) {
             const color = savings > 0 ? 'text-green-600' : 'text-red-600';
             const sign = savings > 0 ? '-' : '+';
-            // Example: -25.7% 🔥
             const fire = savingsPct > 20 ? '🔥' : (savingsPct > 10 ? '✅' : '');
-            savingsHtml = `<span class="${color} font-bold">${sign}${Math.abs(savingsPct).toFixed(1)}% ${fire}</span>`;
+
+            const span = document.createElement('span');
+            span.className = `${color} font-bold`;
+            span.textContent = `${sign}${Math.abs(savingsPct).toFixed(1)}% ${fire}`;
+            tdSavings.appendChild(span);
+        } else {
+            tdSavings.textContent = 'Базовая';
+        }
+        tr.appendChild(tdSavings);
+
+        // Profit Column
+        tr.appendChild(createTd(!isUAE ? formatCurrency(profit) : '0', `px-4 py-4 whitespace-nowrap text-sm font-bold ${profitClass}`));
+
+        // Link Column (Sanitized)
+        const tdLink = document.createElement('td');
+        tdLink.className = "px-4 py-4 whitespace-nowrap text-sm font-medium";
+        const a = document.createElement('a');
+
+        let safeLink = car.link;
+        if (safeLink && (safeLink.trim().toLowerCase().startsWith('javascript:') || safeLink.trim().toLowerCase().startsWith('data:'))) {
+            safeLink = '#';
         }
 
-        // Columns: No, Flag, Year, Site, Price, Landed, vs UAE, Profit
-        tr.innerHTML = `
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${index + 1}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-2xl">${getFlag(car.source_country)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${car.year}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${new URL(car.site).hostname}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatCurrency(car.price, car.currency)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${formatCurrency(car.financials.total_usd)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm">${savingsHtml}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm font-bold ${profitClass}">${!isUAE ? formatCurrency(profit) : '0'}</td>
-             <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                <a href="${car.link}" target="_blank" class="text-blue-600 hover:text-blue-900">Link</a>
-            </td>
-        `;
+        a.href = safeLink;
+        a.target = "_blank";
+        a.className = "text-blue-600 hover:text-blue-900";
+        a.textContent = "Link";
+        tdLink.appendChild(a);
+        tr.appendChild(tdLink);
+
         tbody.appendChild(tr);
     });
 }
